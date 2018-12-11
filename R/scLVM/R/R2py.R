@@ -3,13 +3,16 @@ scLVM_py = function(objName,Y=NULL,geneID=NULL,tech_noise=NULL){
   row.names(Y)=c() #strip Y of column and row names
   colnames(Y)=c()
   python.assign("Y",Y) #outfile is the hdf file generated in the previous setting
-  python.exec("Y = SP.array(Y)") #matrices are passed as lists and need to be converted back to mtrices
+  python.exec("Y = SP.array(Y)") #matrices are passed as lists and need to be converted back to matrices
   python.assign("tech_noise",tech_noise)
   if(!is.null(tech_noise)){
     python.exec("tech_noise = SP.array(tech_noise)")}
-  python.assign("geneID",geneID)  
-  
-  python.exec(paste(objName," = scLVM(Y,geneID=geneID,tech_noise=tech_noise)", sep=""))
+  python.assign("geneID",geneID)
+  python.exec('from scLVM import scLVM')
+  python_code <- paste(objName," = scLVM(Y,geneID=geneID,tech_noise=tech_noise)", sep="")
+  # python.exec('import cPickle as pkl; pkl.dump((Y, geneID, tech_noise), open("test.pkl", "w"))')
+  message(python_code)
+  python.exec(python_code)
   
 }
 
@@ -17,48 +20,51 @@ scLVM_py = function(objName,Y=NULL,geneID=NULL,tech_noise=NULL){
 fitLatent_py = function(objName, idx=NULL, XKnown = NULL, k=1,standardize=FALSE, use_ard=FALSE,interaction=TRUE, initMethod='fast'){
   python.assign("idx",idx-1)#R indexing to python indeces
   python.assign("X0",XKnown)
-  
+
   if(!is.null(XKnown)){
     python.exec("X0 = SP.array(X0)")
     if(is.null(dim(XKnown))){
       python.exec("X0 = SP.reshape(X0,(len(X0),1))")}
   }
-  
+
   python.assign("k",k)
   python.assign("standardize",standardize)
   python.assign("use_ard",use_ard)
   python.assign("interaction",interaction)
   python.assign("initMethod",initMethod)
-  python.exec(paste("X,K,Kint,varGPLVM_ARD = ",objName,".fitFactor(idx=idx, X0=X0, k=k,standardize=standardize, use_ard=use_ard, interaction=interaction, initMethod=initMethod)",sep=""))
-  
+  python.exec(paste("X,K,Kint,varGPLVM_ARD = ",
+                    objName,
+                    ".fitFactor(idx=idx, X0=X0, k=k,standardize=standardize, use_ard=use_ard, interaction=interaction, initMethod=initMethod)",
+                    sep=""))
+
   res=list()
   if(use_ard==TRUE){
     python.exec("Xard = list(varGPLVM_ARD['X_ARD'])")
     X_ard =  python.get("Xard")    
     res$X_ard = X_ard
   }
-  
+
   if(k>1){
     python.exec("X = X.tolist()")
     X = do.call(rbind,python.get("X"))
     res$X = X
-    
+
   }else{
     python.exec("X = X.tolist()")
     X =  python.get("X")    
     res$X = unlist(X)
   }
-  
+
   python.exec("K = K.tolist()")
   K = do.call(rbind,python.get("K"))
   res$K = K
-  
+
   if(interaction==TRUE & !is.null(XKnown)){
     python.exec("Kint = Kint.tolist()")
     Kint = do.call(rbind,python.get("Kint"))
     res$Kint = Kint
   }
-  
+
   return(res)
 }
 
